@@ -9,12 +9,13 @@
 #include <QPoint>
 #include <QRectF>
 #include <algorithm>
+#include <memory>
 
 #include "viewtransform.h"
 
 class ControlPoint;
 
-class Figure {  // 抽象基类
+class Figure : public std::enable_shared_from_this<Figure> {  // 抽象基类
 public:
     Figure();
     Figure(const Figure &other);
@@ -50,6 +51,7 @@ protected:
     QBrush brush;
     ViewTransform *viewTf;
     std::vector<std::shared_ptr<ControlPoint>> ctrlPtList;
+    bool isdeleted = false;
 };
 
 class ControlPoint {
@@ -65,8 +67,9 @@ public:
         Left,
         Right
     };
-    ControlPoint(Figure *f, dir i, QPointF p);
+    ControlPoint(std::shared_ptr<Figure> f, dir i, QPointF p);
     ControlPoint(const ControlPoint &other);
+    ~ControlPoint();
     dir type;
     QRectF bdrect;
     double rad = 3;  // 半径
@@ -81,10 +84,10 @@ public:
     void setFig(std::shared_ptr<Figure> fig);
     ControlPoint *clone();
     bool contain(QPointF p);
-    std::shared_ptr<Figure> getParent();
+    std::weak_ptr<Figure> getParent();
 
 private:
-    std::shared_ptr<Figure> fig;
+    std::weak_ptr<Figure> fig;
 };
 
 class RectFig : public Figure {

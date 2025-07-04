@@ -18,7 +18,14 @@ Figure::Figure(const Figure &other)
     }
 }
 
-Figure::~Figure() { qDebug() << "Figure 析构：" << this; }
+Figure::~Figure() {
+    qDebug() << "Figure 析构：" << this;
+    if (isdeleted) {
+        return;
+    }
+    isdeleted = true;
+    ctrlPtList.clear();
+}
 
 void Figure::moveTo(QPointF p) { moveTo(p.x(), p.y()); }
 
@@ -55,9 +62,8 @@ std::vector<QPointF> Figure::getCtrlPoint() {
 
 Figure::FigType Figure::getType() { return type; }
 
-ControlPoint::ControlPoint(Figure *f, dir i, QPointF p) {
-    std::shared_ptr<Figure> temp(f);
-    fig = temp;
+ControlPoint::ControlPoint(std::shared_ptr<Figure> f, dir i, QPointF p) {
+    fig = f;
     type = i;
     bdrect = QRectF{p - QPointF{rad, rad}, p + QPointF{rad, rad}};
 }
@@ -69,12 +75,15 @@ ControlPoint::ControlPoint(const ControlPoint &other) {
     rad = other.rad;
 }
 
+ControlPoint::~ControlPoint() { qDebug() << "ctrlPt released" << this; }
+
 void ControlPoint::paint(QPainter *painter) {
     painter->save();
     painter->setPen(QPen(Qt::black, 2));
     painter->setBrush(QBrush(Qt::white));
     // 动态调整控制点的大小
-    painter->drawRect(fig->viewTf->WTV(bdrect));
+    auto logPt = fig.lock();
+    if (logPt) painter->drawRect(logPt->viewTf->WTV(bdrect));
 
     painter->restore();
 }
@@ -85,18 +94,23 @@ void ControlPoint::translate(double x, double y) {
 void ControlPoint::translate(QPointF p) { bdrect.translate(p); }
 
 void ControlPoint::ctrlTranslate(double x, double y) {
+    auto logPt = fig.lock();
+    if (!logPt) {
+        return;
+        qDebug() << "无效的指针";
+    }
     switch (type) {
         case TopLeft:
-            fig->adjust(x, y, 0, 0);
+            logPt->adjust(x, y, 0, 0);
             break;
         case TopRight:
-            fig->adjust(0, y, x, 0);
+            logPt->adjust(0, y, x, 0);
             break;
         case BottomLeft:
-            fig->adjust(x, 0, y, 0);
+            logPt->adjust(x, 0, y, 0);
             break;
         case BottomRight:
-            fig->adjust(0, 0, x, y);
+            logPt->adjust(0, 0, x, y);
             break;
     }
 }
@@ -113,19 +127,19 @@ ControlPoint *ControlPoint::clone() { return new ControlPoint(*this); }
 
 bool ControlPoint::contain(QPointF p) { return bdrect.contains(p); }
 
-std::shared_ptr<Figure> ControlPoint::getParent() { return fig; }
+std::weak_ptr<Figure> ControlPoint::getParent() { return fig; }
 
 RectFig::RectFig(QPointF p, int w, int h) {
     bdrect = QRectF{p, QPointF(p.x() + w, p.y() + h)};
     selected = false;
     ctrlPtList.push_back(std::make_shared<ControlPoint>(
-        this, ControlPoint::TopLeft, bdrect.topLeft()));
+        shared_from_this(), ControlPoint::TopLeft, bdrect.topLeft()));
     ctrlPtList.push_back(std::make_shared<ControlPoint>(
-        this, ControlPoint::TopRight, bdrect.topRight()));
+        shared_from_this(), ControlPoint::TopRight, bdrect.topRight()));
     ctrlPtList.push_back(std::make_shared<ControlPoint>(
-        this, ControlPoint::BottomLeft, bdrect.bottomLeft()));
+        shared_from_this(), ControlPoint::BottomLeft, bdrect.bottomLeft()));
     ctrlPtList.push_back(std::make_shared<ControlPoint>(
-        this, ControlPoint::BottomRight, bdrect.bottomRight()));
+        shared_from_this(), ControlPoint::BottomRight, bdrect.bottomRight()));
     qDebug() << "a rect is created";
 }
 

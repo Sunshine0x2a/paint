@@ -265,13 +265,13 @@ void Canva::onCreate(Figure::FigType type) {
         std::make_shared<AddFigCmd>(this, type, viewTf->VTW(lastRightViewPos)));
 }
 
-void Canva::onAdjust(std::shared_ptr<Figure> fig,
-                     std::vector<QPointF> preList) {
-    //    std::make_shared<AdjustCmd>(this, preList, tempPt));
-}
 
 void Canva::handleSingleSel() {
     std::vector<std::shared_ptr<Figure>> tempSelList = selList;
+    ctrlPtList.clear();
+    if (selList.size() == 1) {
+        ctrlPtList = selList[0]->ctrlPtList;
+    }
     has_selCPt = false;
     for (auto &it : ctrlPtList) {  // 优先选中控制点
         if (it->contain(worldPos)) {
@@ -279,8 +279,6 @@ void Canva::handleSingleSel() {
                 has_selCPt = true;
                 lastWorldPos = viewTf->VTW(viewPos);
                 tempLastWorldPos = lastWorldPos;
-                prePtList = it->getParent()->getCtrlPoint();
-                preSelFig = it->getParent();
             }
             selCPt = it;
             return;
@@ -302,12 +300,6 @@ void Canva::handleSingleSel() {
                 ctrlPtList = (*it)->ctrlPtList;
                 cmdStack->executeCommand(
                     std::make_shared<SelCmd>(this, tempSelList, selList));
-                if (!prePtList.empty() && *it != preSelFig) {
-                    // 当选中与过去不同的Figure时，进行调整命令
-                    onAdjust(*it, prePtList);
-                }
-                prePtList.clear();
-                preSelFig = *it;
             }
             return;
         }
@@ -319,14 +311,8 @@ void Canva::handleSingleSel() {
         }
         selList.clear();
         ctrlPtList.clear();
-        if (!prePtList.empty() && preSelFig != nullptr) {
-            // 过去选中图形和控制点时，进行调整命令;
-            onAdjust(preSelFig, prePtList);
-        }
         cmdStack->executeCommand(
             std::make_shared<SelCmd>(this, tempSelList, selList));
-        prePtList.clear();
-        preSelFig = nullptr;
     }
 }
 

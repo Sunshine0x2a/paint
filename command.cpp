@@ -85,7 +85,10 @@ AddFigCmd::~AddFigCmd() {}
 
 void AddFigCmd::execute() { canva->addToList(fig); }
 
-void AddFigCmd::undo() { canva->removeFromList(fig); }
+void AddFigCmd::undo() {
+    canva->removeFromList(fig);
+    canva->ctrlPtList.clear();
+}
 
 void AddFigCmd::redo() { canva->addToList(fig); }
 

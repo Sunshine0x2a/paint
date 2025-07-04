@@ -57,7 +57,6 @@ private:
     std::vector<std::shared_ptr<Figure>> selList;  // 选中图形列表
     std::vector<std::shared_ptr<Figure>> preSelList;  // 记录过去选择的图形列表
     std::vector<std::shared_ptr<ControlPoint>> ctrlPtList;
-    std::vector<QPointF> prePtList;  // 记录过去图形控制点的坐标;
     QMenu *normalMenu;  // 未选中图形下的菜单
     QMenu *figMenu;     // 2级图形菜单
     QMenu *selMenu;     // 有选中图形的菜单
@@ -73,9 +72,7 @@ private:
     double newScale = 1;  // 分别记录缩放
     std::shared_ptr<Figure> copyFig = nullptr;
     std::shared_ptr<ControlPoint> selCPt = nullptr;
-    std::shared_ptr<Figure> preSelFig = nullptr;  // 记录上一次选择的图形
     void onCreate(Figure::FigType type);
-    void onAdjust(std::shared_ptr<Figure> fig, std::vector<QPointF> preList);
     void handleSingleSel();
     void handleMultipleSel();
     template <typename T>
@@ -89,6 +86,8 @@ private slots:
     void onCopy();
     void onPaste();
     void onCancelCps();
+
+    friend class AddFigCmd;
 };
 
 #endif  // CANVA_H
