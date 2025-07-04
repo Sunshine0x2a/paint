@@ -25,12 +25,12 @@ public:
     ~Canva();
     QPen dftPen;
     QBrush dftBrush;
-    void addToList(std::shared_ptr<Figure>);
-    void removeFromList(std::shared_ptr<Figure>);
-    void addToSelList(std::shared_ptr<Figure>);
-    void removeFromSelList(std::shared_ptr<Figure>);
-    void addToCtrlPtList(std::vector<std::shared_ptr<ControlPoint>>);
-    void removeFromCtrlPtList(std::vector<std::shared_ptr<ControlPoint>>);
+    void addToList(Figure *);
+    void removeFromList(Figure *);
+    void addToSelList(Figure *);
+    void removeFromSelList(Figure *);
+    void addToCtrlPtList(std::vector<ControlPoint *>);
+    void removeFromCtrlPtList(std::vector<ControlPoint *>);
     QPointF viewPos;           // 鼠标视图位置
     QPointF worldPos;          // 鼠标在逻辑世界中的位置
     QPointF globalPos;         // 鼠标全局位置
@@ -40,7 +40,7 @@ public:
     QPointF tempLastWorldPos;  // 临时记录移动图形时鼠标的位置，实现平滑移动
     QPointF tempLastGlobalPos;
     ViewTransform *viewTf;
-    std::vector<std::shared_ptr<Figure>> &SELLIST();
+    std::vector<Figure *> &SELLIST();
 
 protected:
     void paintEvent(QPaintEvent *event);
@@ -53,10 +53,10 @@ protected:
     void resizeEvent(QResizeEvent *event);
 
 private:
-    std::vector<std::shared_ptr<Figure>> figList;
-    std::vector<std::shared_ptr<Figure>> selList;  // 选中图形列表
-    std::vector<std::shared_ptr<Figure>> preSelList;  // 记录过去选择的图形列表
-    std::vector<std::shared_ptr<ControlPoint>> ctrlPtList;
+    std::vector<Figure *> figList;
+    std::vector<Figure *> selList;     // 选中图形列表
+    std::vector<Figure *> preSelList;  // 记录过去选择的图形列表
+    std::vector<ControlPoint *> ctrlPtList;
     QMenu *normalMenu;  // 未选中图形下的菜单
     QMenu *figMenu;     // 2级图形菜单
     QMenu *selMenu;     // 有选中图形的菜单
@@ -70,8 +70,8 @@ private:
     bool has_selCPt = false;    // 记录是否已经选中了控制点
     double preScale = 1;
     double newScale = 1;  // 分别记录缩放
-    std::shared_ptr<Figure> copyFig = nullptr;
-    std::shared_ptr<ControlPoint> selCPt = nullptr;
+    Figure *copyFig = nullptr;
+    ControlPoint *selCPt = nullptr;
     void onCreate(Figure::FigType type);
     void handleSingleSel();
     void handleMultipleSel();

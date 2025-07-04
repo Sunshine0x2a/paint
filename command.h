@@ -73,13 +73,13 @@ private:
 
 class DelFigCmd : public Command {
 public:
-    DelFigCmd(Canva* c, std::vector<std::shared_ptr<Figure>> f);
+    DelFigCmd(Canva* c, std::vector<Figure*> f);
     void execute();
     void undo();
     void redo();
 
 private:
-    std::vector<std::shared_ptr<Figure>> figList;
+    std::vector<Figure*> figList;
 };
 
 // 将视图缩放比例恢复
@@ -110,39 +110,37 @@ private:
 
 class PasteCmd : public Command {
 public:
-    PasteCmd(Canva* c, std::shared_ptr<Figure> f, QPointF p);
+    PasteCmd(Canva* c, Figure* f, QPointF p);
     ~PasteCmd();
     void execute();
     void undo();
     void redo();
 
 private:
-    std::shared_ptr<Figure> fig;
+    Figure* fig;
 };
 
 class SelCmd : public Command {  // 不只选中，取消选中也采用该命令
 public:
-    SelCmd(Canva* c, std::vector<std::shared_ptr<Figure>> preL,
-           std::vector<std::shared_ptr<Figure>> newL);
+    SelCmd(Canva* c, std::vector<Figure*> preL, std::vector<Figure*> newL);
     void execute();
     void undo();
     void redo();
 
 private:
-    std::vector<std::shared_ptr<Figure>> preSelList;
-    std::vector<std::shared_ptr<Figure>> newSelList;
+    std::vector<Figure*> preSelList;
+    std::vector<Figure*> newSelList;
 };
 
 class MoveCmd : public Command {
 public:
-    MoveCmd(Canva* c, std::vector<std::shared_ptr<Figure>> selL, QPointF preP,
-            QPointF newP);
+    MoveCmd(Canva* c, std::vector<Figure*> selL, QPointF preP, QPointF newP);
     void execute();
     void undo();
     void redo();
 
 private:
-    std::vector<std::shared_ptr<Figure>> selList;
+    std::vector<Figure*> selList;
     QPointF prePoint;
     QPointF newPoint;
 };
@@ -160,30 +158,30 @@ private:
 
 class CpsFigCmd : public Command {
 public:
-    CpsFigCmd(Canva* c, std::vector<std::shared_ptr<Figure>> f);
+    CpsFigCmd(Canva* c, std::vector<Figure*> f);
     void execute();
     void undo();
     void redo();
 
 private:
     std::shared_ptr<Figure> cpsFig;
-    std::vector<std::shared_ptr<Figure>> figList;
+    std::vector<Figure*> figList;
 };
 
 class CancelCpsCmd : public Command {
 public:
-    CancelCpsCmd(Canva* c, std::shared_ptr<Figure> fig);
+    CancelCpsCmd(Canva* c, Figure* fig);
     void execute();
     void undo();
     void redo();
 
 private:
-    std::shared_ptr<CpsFig> fig;
+    CpsFig* fig;
 };
 
 class AdjustCmd : public Command {
 public:
-    AdjustCmd(Canva* c, std::vector<QPointF> pre, std::shared_ptr<Figure> f);
+    AdjustCmd(Canva* c, std::vector<QPointF> pre, Figure* f);
     void execute();
     void undo();
     void redo();
@@ -191,7 +189,7 @@ public:
 private:
     std::vector<QPointF> preList;
     std::vector<QPointF> newList;
-    std::shared_ptr<Figure> fig;
+    Figure* fig;
 };
 
 #endif  // COMMAND_H

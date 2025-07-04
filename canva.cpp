@@ -55,24 +55,24 @@ Canva::~Canva() {
     delete viewTf;
 }
 
-void Canva::addToList(std::shared_ptr<Figure> f) {
+void Canva::addToList(Figure *f) {
     figList.push_back(f);
     // qDebug() << figList.size();
 }
 
-void Canva::removeFromList(std::shared_ptr<Figure> f) {
+void Canva::removeFromList(Figure *f) {
     auto it = std::find(figList.begin(), figList.end(), f);
     if (it != figList.end()) {
         figList.erase(it);
     }
 }
 
-void Canva::addToSelList(std::shared_ptr<Figure> f) {
+void Canva::addToSelList(Figure *f) {
     selList.push_back(f);
     f->setSelected(true);
 }
 
-void Canva::removeFromSelList(std::shared_ptr<Figure> f) {
+void Canva::removeFromSelList(Figure *f) {
     auto it = std::find(selList.begin(), selList.end(), f);
     if (it != selList.end()) {
         selList.erase(it);
@@ -80,17 +80,17 @@ void Canva::removeFromSelList(std::shared_ptr<Figure> f) {
     }
 }
 
-void Canva::addToCtrlPtList(std::vector<std::shared_ptr<ControlPoint>> l) {
+void Canva::addToCtrlPtList(std::vector<ControlPoint *> l) {
     ctrlPtList.insert(ctrlPtList.end(), l.begin(), l.end());
 }
 
-void Canva::removeFromCtrlPtList(std::vector<std::shared_ptr<ControlPoint>> l) {
+void Canva::removeFromCtrlPtList(std::vector<ControlPoint *> l) {
     auto begin = std::find(ctrlPtList.begin(), ctrlPtList.end(), *l.begin());
     auto end = std::find(ctrlPtList.begin(), ctrlPtList.end(), *l.end());
     ctrlPtList.erase(begin, end);
 }
 
-std::vector<std::shared_ptr<Figure>> &Canva::SELLIST() { return selList; }
+std::vector<Figure *> &Canva::SELLIST() { return selList; }
 
 void Canva::paintEvent(QPaintEvent *event) {
     QPainter painter(this);
@@ -267,7 +267,7 @@ void Canva::onCreate(Figure::FigType type) {
 
 
 void Canva::handleSingleSel() {
-    std::vector<std::shared_ptr<Figure>> tempSelList = selList;
+    std::vector<Figure *> tempSelList = selList;
     ctrlPtList.clear();
     if (selList.size() == 1) {
         ctrlPtList = selList[0]->ctrlPtList;

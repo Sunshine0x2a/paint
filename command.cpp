@@ -83,16 +83,16 @@ AddFigCmd::AddFigCmd(Canva* c, Figure::FigType type, QPointF p) {
 
 AddFigCmd::~AddFigCmd() {}
 
-void AddFigCmd::execute() { canva->addToList(fig); }
+void AddFigCmd::execute() { canva->addToList(fig.get()); }
 
 void AddFigCmd::undo() {
-    canva->removeFromList(fig);
+    canva->removeFromList(fig.get());
     canva->ctrlPtList.clear();
 }
 
-void AddFigCmd::redo() { canva->addToList(fig); }
+void AddFigCmd::redo() { canva->addToList(fig.get()); }
 
-DelFigCmd::DelFigCmd(Canva* c, std::vector<std::shared_ptr<Figure>> f) {
+DelFigCmd::DelFigCmd(Canva* c, std::vector<Figure*> f) {
     type = Del;
     canva = c;
     figList = f;
@@ -162,10 +162,10 @@ void ComposeCmd::redo() {
     }
 }
 
-PasteCmd::PasteCmd(Canva* c, std::shared_ptr<Figure> f, QPointF p) {
+PasteCmd::PasteCmd(Canva* c, Figure* f, QPointF p) {
     type = Paste;
     canva = c;
-    std::shared_ptr<Figure> tempFig(f->clone());
+    Figure* tempFig(f->clone());
     fig = tempFig;
     fig->moveTo(p);
     fig->print();
@@ -188,8 +188,7 @@ void PasteCmd::undo() {
 
 void PasteCmd::redo() { execute(); }
 
-SelCmd::SelCmd(Canva* c, std::vector<std::shared_ptr<Figure>> preL,
-               std::vector<std::shared_ptr<Figure>> newL) {
+SelCmd::SelCmd(Canva* c, std::vector<Figure*> preL, std::vector<Figure*> newL) {
     type = Sel;
     preSelList = preL;
     newSelList = newL;
@@ -218,8 +217,8 @@ void SelCmd::redo() {
     }
 }
 
-MoveCmd::MoveCmd(Canva* c, std::vector<std::shared_ptr<Figure>> selL,
-                 QPointF preP, QPointF newP) {
+MoveCmd::MoveCmd(Canva* c, std::vector<Figure*> selL, QPointF preP,
+                 QPointF newP) {
     canva = c;
     selList = selL;
     prePoint = preP;
@@ -255,7 +254,7 @@ void PanCmd::undo() { canva->viewTf->translate(delta); }
 
 void PanCmd::redo() { canva->viewTf->translate(-delta); }
 
-CpsFigCmd::CpsFigCmd(Canva* c, std::vector<std::shared_ptr<Figure>> f) {
+CpsFigCmd::CpsFigCmd(Canva* c, std::vector<Figure*> f) {
     canva = c;
     cpsFig = std::make_shared<CpsFig>(f);
     figList = f;
@@ -267,13 +266,13 @@ void CpsFigCmd::execute() {
         canva->removeFromList(it);
         canva->removeFromSelList(it);
     }
-    canva->addToList(cpsFig);
-    canva->addToSelList(cpsFig);
+    canva->addToList(cpsFig.get());
+    canva->addToSelList(cpsFig.get());
 }
 
 void CpsFigCmd::undo() {
-    canva->removeFromList(cpsFig);
-    canva->removeFromSelList(cpsFig);
+    canva->removeFromList(cpsFig.get());
+    canva->removeFromSelList(cpsFig.get());
     for (auto it : figList) {
         canva->addToList(it);
         canva->addToSelList(it);
@@ -285,17 +284,17 @@ void CpsFigCmd::redo() {
         canva->removeFromList(it);
         canva->removeFromSelList(it);
     }
-    canva->addToList(cpsFig);
-    canva->addToSelList(cpsFig);
+    canva->addToList(cpsFig.get());
+    canva->addToSelList(cpsFig.get());
 }
 
-CancelCpsCmd::CancelCpsCmd(Canva* c, std::shared_ptr<Figure> f) {
+CancelCpsCmd::CancelCpsCmd(Canva* c, Figure* f) {
     canva = c;
     if (f->getType() != Figure::Cps) {
         qDebug() << "不是组合图形";
         return;
     }
-    fig = std::dynamic_pointer_cast<CpsFig>(f);
+    fig = dynamic_cast<CpsFig*>(f);
 }
 
 void CancelCpsCmd::execute() {
@@ -318,8 +317,7 @@ void CancelCpsCmd::undo() {
 
 void CancelCpsCmd::redo() { execute(); }
 
-AdjustCmd::AdjustCmd(Canva* c, std::vector<QPointF> pre,
-                     std::shared_ptr<Figure> f) {
+AdjustCmd::AdjustCmd(Canva* c, std::vector<QPointF> pre, Figure* f) {
     canva = c;
     if (f == nullptr) {
         qDebug() << "无效的指针";

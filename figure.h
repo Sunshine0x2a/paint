@@ -15,7 +15,7 @@
 
 class ControlPoint;
 
-class Figure : public std::enable_shared_from_this<Figure> {  // 抽象基类
+class Figure {  // 抽象基类
 public:
     Figure();
     Figure(const Figure &other);
@@ -50,7 +50,7 @@ protected:
     QPen pen;
     QBrush brush;
     ViewTransform *viewTf;
-    std::vector<std::shared_ptr<ControlPoint>> ctrlPtList;
+    std::vector<ControlPoint *> ctrlPtList;
     bool isdeleted = false;
 };
 
@@ -67,7 +67,7 @@ public:
         Left,
         Right
     };
-    ControlPoint(std::shared_ptr<Figure> f, dir i, QPointF p);
+    ControlPoint(Figure *f, dir i, QPointF p);
     ControlPoint(const ControlPoint &other);
     ~ControlPoint();
     dir type;
@@ -81,13 +81,13 @@ public:
     void ctrlTranslate(QPointF p);
     void ctrlMoveTo(double x, double y);
     void ctrlMoveTo(QPointF p);
-    void setFig(std::shared_ptr<Figure> fig);
+    void setFig(Figure *fig);
     ControlPoint *clone();
     bool contain(QPointF p);
-    std::weak_ptr<Figure> getParent();
+    Figure *getParent();
 
 private:
-    std::weak_ptr<Figure> fig;
+    Figure *fig;
 };
 
 class RectFig : public Figure {
@@ -106,7 +106,7 @@ public:
 class CpsFig : public Figure {
 public:
     // CpsFig(QPointF p,int w, int h);
-    CpsFig(std::vector<std::shared_ptr<Figure>> f);
+    CpsFig(std::vector<Figure *> f);
     CpsFig(const CpsFig &other);
     void paint(QPainter *painter) const override;
     void translate(double x, double y) override;
@@ -115,10 +115,10 @@ public:
     CpsFig *clone() override;
     void adjust(double x, double y, double x0, double y0) override;
 
-    std::vector<std::shared_ptr<Figure>> List();  // 调试用
+    std::vector<Figure *> List();  // 调试用
 
 private:
-    std::vector<std::shared_ptr<Figure>> figList;
+    std::vector<Figure *> figList;
 };
 
 #endif  // FIGURE_H

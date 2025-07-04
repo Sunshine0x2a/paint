@@ -11,19 +11,17 @@ Figure::Figure(const Figure &other)
       viewTf(other.viewTf)  // 目前实现的是单个画布，实现多画布时在进行改动
 {
     for (auto &it : other.ctrlPtList) {
-        ctrlPtList.push_back(std::make_shared<ControlPoint>(*it));
+        ctrlPtList.push_back(it->clone());
     }
     for (auto it : ctrlPtList) {
-        it->setFig(std::shared_ptr<Figure>(this));
+        it->setFig(this);
     }
 }
 
 Figure::~Figure() {
-    qDebug() << "Figure 析构：" << this;
-    if (isdeleted) {
-        return;
+    for (auto it : ctrlPtList) {
+        delete it;
     }
-    isdeleted = true;
     ctrlPtList.clear();
 }
 
@@ -62,7 +60,7 @@ std::vector<QPointF> Figure::getCtrlPoint() {
 
 Figure::FigType Figure::getType() { return type; }
 
-ControlPoint::ControlPoint(std::shared_ptr<Figure> f, dir i, QPointF p) {
+ControlPoint::ControlPoint(Figure *f, dir i, QPointF p) {
     fig = f;
     type = i;
     bdrect = QRectF{p - QPointF{rad, rad}, p + QPointF{rad, rad}};
@@ -82,8 +80,8 @@ void ControlPoint::paint(QPainter *painter) {
     painter->setPen(QPen(Qt::black, 2));
     painter->setBrush(QBrush(Qt::white));
     // 动态调整控制点的大小
-    auto logPt = fig.lock();
-    if (logPt) painter->drawRect(logPt->viewTf->WTV(bdrect));
+
+    painter->drawRect(fig->viewTf->WTV(bdrect));
 
     painter->restore();
 }
@@ -94,23 +92,18 @@ void ControlPoint::translate(double x, double y) {
 void ControlPoint::translate(QPointF p) { bdrect.translate(p); }
 
 void ControlPoint::ctrlTranslate(double x, double y) {
-    auto logPt = fig.lock();
-    if (!logPt) {
-        return;
-        qDebug() << "无效的指针";
-    }
     switch (type) {
         case TopLeft:
-            logPt->adjust(x, y, 0, 0);
+            fig->adjust(x, y, 0, 0);
             break;
         case TopRight:
-            logPt->adjust(0, y, x, 0);
+            fig->adjust(0, y, x, 0);
             break;
         case BottomLeft:
-            logPt->adjust(x, 0, y, 0);
+            fig->adjust(x, 0, y, 0);
             break;
         case BottomRight:
-            logPt->adjust(0, 0, x, y);
+            fig->adjust(0, 0, x, y);
             break;
     }
 }
@@ -121,25 +114,25 @@ void ControlPoint::ctrlMoveTo(double x, double y) { ctrlMoveTo({x, y}); }
 
 void ControlPoint::ctrlMoveTo(QPointF p) { ctrlTranslate(p - bdrect.center()); }
 
-void ControlPoint::setFig(std::shared_ptr<Figure> f) { fig = f; }
+void ControlPoint::setFig(Figure *f) { fig = f; }
 
 ControlPoint *ControlPoint::clone() { return new ControlPoint(*this); }
 
 bool ControlPoint::contain(QPointF p) { return bdrect.contains(p); }
 
-std::weak_ptr<Figure> ControlPoint::getParent() { return fig; }
+Figure *ControlPoint::getParent() { return fig; }
 
 RectFig::RectFig(QPointF p, int w, int h) {
     bdrect = QRectF{p, QPointF(p.x() + w, p.y() + h)};
     selected = false;
-    ctrlPtList.push_back(std::make_shared<ControlPoint>(
-        shared_from_this(), ControlPoint::TopLeft, bdrect.topLeft()));
-    ctrlPtList.push_back(std::make_shared<ControlPoint>(
-        shared_from_this(), ControlPoint::TopRight, bdrect.topRight()));
-    ctrlPtList.push_back(std::make_shared<ControlPoint>(
-        shared_from_this(), ControlPoint::BottomLeft, bdrect.bottomLeft()));
-    ctrlPtList.push_back(std::make_shared<ControlPoint>(
-        shared_from_this(), ControlPoint::BottomRight, bdrect.bottomRight()));
+    ctrlPtList.push_back(
+        new ControlPoint(this, ControlPoint::TopLeft, bdrect.topLeft()));
+    ctrlPtList.push_back(
+        new ControlPoint(this, ControlPoint::TopRight, bdrect.topRight()));
+    ctrlPtList.push_back(
+        new ControlPoint(this, ControlPoint::BottomLeft, bdrect.bottomLeft()));
+    ctrlPtList.push_back(new ControlPoint(this, ControlPoint::BottomRight,
+                                          bdrect.bottomRight()));
     qDebug() << "a rect is created";
 }
 
@@ -194,7 +187,7 @@ void RectFig::adjust(double x, double y, double x0, double y0) {
     ctrlPtList[3]->translate(x0, y0);
 }
 
-CpsFig::CpsFig(std::vector<std::shared_ptr<Figure>> f) {
+CpsFig::CpsFig(std::vector<Figure *> f) {
     type = Cps;
     figList = f;
     bdrect = f[0]->boundingRect();
@@ -206,7 +199,7 @@ CpsFig::CpsFig(std::vector<std::shared_ptr<Figure>> f) {
 CpsFig::CpsFig(const CpsFig &other) : Figure(other) {
     for (auto it : other.figList) {
         auto i = it->clone();
-        figList.push_back(std::shared_ptr<Figure>(i));
+        figList.push_back(i);
     }
 }
 
@@ -252,4 +245,4 @@ CpsFig *CpsFig::clone() { return new CpsFig(*this); }
 
 void CpsFig::adjust(double x, double y, double x0, double y0) {}
 
-std::vector<std::shared_ptr<Figure>> CpsFig::List() { return figList; }
+std::vector<Figure *> CpsFig::List() { return figList; }
