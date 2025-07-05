@@ -7,6 +7,7 @@
 #include <QEvent>
 #include <QMenu>
 #include <QMouseEvent>
+#include <QObject>
 #include <QPainter>
 #include <QPen>
 #include <QTimer>
@@ -57,6 +58,7 @@ private:
     std::vector<Figure *> selList;     // 选中图形列表
     std::vector<Figure *> preSelList;  // 记录过去选择的图形列表
     std::vector<ControlPoint *> ctrlPtList;
+    std::vector<QPointF> preCtrlPtLocation;  // 记录过去控制图形的位置
     QMenu *normalMenu;  // 未选中图形下的菜单
     QMenu *figMenu;     // 2级图形菜单
     QMenu *selMenu;     // 有选中图形的菜单
@@ -67,11 +69,13 @@ private:
     bool is_selecting = false;  // 记录是否在进行多选
     bool is_zooming = false;    // 记录是否在缩放屏幕
     bool is_dragging = false;   // 记录是否在拖拽图形
+    bool is_adjusting = false;
     bool has_selCPt = false;    // 记录是否已经选中了控制点
     double preScale = 1;
     double newScale = 1;  // 分别记录缩放
     Figure *copyFig = nullptr;
     ControlPoint *selCPt = nullptr;
+    void onAdjust();
     void onCreate(Figure::FigType type);
     void handleSingleSel();
     void handleMultipleSel();

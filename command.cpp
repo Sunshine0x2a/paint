@@ -323,8 +323,10 @@ AdjustCmd::AdjustCmd(Canva* c, std::vector<QPointF> pre, Figure* f) {
         qDebug() << "无效的指针";
         return;
     }
+    fig = f;
     preList = pre;
     newList = f->getCtrlPoint();
+    qDebug() << pre.size() << newList.size();
     type = Adjust;
 }
 

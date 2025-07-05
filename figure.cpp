@@ -100,7 +100,7 @@ void ControlPoint::ctrlTranslate(double x, double y) {
             fig->adjust(0, y, x, 0);
             break;
         case BottomLeft:
-            fig->adjust(x, 0, y, 0);
+            fig->adjust(x, 0, 0, y);
             break;
         case BottomRight:
             fig->adjust(0, 0, x, y);

@@ -268,22 +268,29 @@ void Canva::onCreate(Figure::FigType type) {
 
 void Canva::handleSingleSel() {
     std::vector<Figure *> tempSelList = selList;
-    ctrlPtList.clear();
-    if (selList.size() == 1) {
-        ctrlPtList = selList[0]->ctrlPtList;
-    }
-    has_selCPt = false;
     for (auto &it : ctrlPtList) {  // 优先选中控制点
         if (it->contain(worldPos)) {
+            if (!is_adjusting) {
+                is_adjusting = true;
+                preCtrlPtLocation = it->getParent()->getCtrlPoint();
+            }
             if (!has_selCPt) {
                 has_selCPt = true;
                 lastWorldPos = viewTf->VTW(viewPos);
-                tempLastWorldPos = lastWorldPos;
+                tempLastWorldPos = lastWorldPos;           
             }
             selCPt = it;
             return;
         }
     }
+    if (is_adjusting &&
+        lastWorldPos !=
+            worldPos) {  // 说明过去对操作点进行过操作且过去是有操作点的
+        cmdStack->executeCommand(
+            std::make_shared<AdjustCmd>(this, preCtrlPtLocation, selList[0]));
+    }
+    has_selCPt = false;
+    is_adjusting = false;
     selCPt = nullptr;
     for (auto it = figList.rbegin(); it != figList.rend();
          it++) {  // 反向遍历，优先选中顶层
