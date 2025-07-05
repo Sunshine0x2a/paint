@@ -92,6 +92,8 @@ private slots:
     void onCancelCps();
 
     friend class AddFigCmd;
+    friend class CpsFigCmd;  // 仅用于调用控制点列表
+    friend class CancelCpsCmd;
 };
 
 #endif  // CANVA_H

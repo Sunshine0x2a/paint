@@ -20,8 +20,9 @@ public:
     Figure();
     Figure(const Figure &other);
     ~Figure();
-    enum FigType { Rect, CopyCompose, Cps };
+    enum FigType { Rect, CopyCompose, Cps, Ell };
     bool selected;
+    bool inCps = false;
     virtual void paint(QPainter *painter) const = 0;
     virtual void translate(double x,
                            double y) = 0;         // 平移该图形(以bdrect为主体)
@@ -31,7 +32,8 @@ public:
     virtual int contain(QPointF p) const = 0;
     virtual void print();  // 调试用
     virtual void setSelected(bool);
-    virtual void adjust(double x, double y, double x0, double y0) = 0;
+    virtual void adjust(double x, double y, double x0, double y0);
+    // 默认的包围盒的实现，每一种图形都有这个统一的接口,且通过这个函数进行调整时，说明是通过包围盒调整
     void adjust(std::vector<QPointF> p);
 
     QRectF boundingRect();
@@ -57,7 +59,7 @@ protected:
 class ControlPoint {
 public:
     enum dir {
-        Common,
+        Common,  // 除Common外其他都为特殊控制点，用以指示包围盒的变动
         TopLeft,
         TopRight,
         BottomLeft,
@@ -73,10 +75,14 @@ public:
     dir type;
     QRectF bdrect;
     double rad = 3;  // 半径
+    double rx;
+    double ry;
     void paint(QPainter *painter);
     void moveTo();
     void translate(double x, double y);  // 纯粹移动
     void translate(QPointF p);
+    void moveTo(double x, double y);
+    void moveTo(QPointF p);
     void ctrlTranslate(double x, double y);  // 控制点移动
     void ctrlTranslate(QPointF p);
     void ctrlMoveTo(double x, double y);
@@ -90,19 +96,6 @@ private:
     Figure *fig;
 };
 
-class RectFig : public Figure {
-public:
-    RectFig(QPointF p, int w, int h);
-    RectFig(const RectFig &other);
-    void paint(QPainter *painter) const override;
-    void translate(double x, double y) override;
-    void moveTo(double x, double y) override;
-    int contain(QPointF p) const override;
-    RectFig *clone() override;
-    void adjust(double x, double y, double x0, double y0) override;
-    // 上左，上右，下左，下右
-};
-
 class CpsFig : public Figure {
 public:
     // CpsFig(QPointF p,int w, int h);
@@ -114,11 +107,39 @@ public:
     int contain(QPointF p) const override;
     CpsFig *clone() override;
     void adjust(double x, double y, double x0, double y0) override;
+    void setSelected(bool b) override;
 
     std::vector<Figure *> List();  // 调试用
 
 private:
     std::vector<Figure *> figList;
+};
+
+class RectFig : public Figure {
+public:
+    RectFig(QPointF p, int w, int h);
+    RectFig(const RectFig &other);
+    void paint(QPainter *painter) const override;
+    void translate(double x, double y) override;
+    void moveTo(double x, double y) override;
+    int contain(QPointF p) const override;
+    RectFig *clone() override;
+    void adjust(double x, double y, double x0,
+                double y0) override;  // 矩形重写提高效率
+    //  上左，上右，下左，下右
+};
+
+class EllFig : public Figure {
+public:
+    EllFig(QPointF p, int w, int h);
+    EllFig(const EllFig &other);
+    EllFig *clone() override;
+    void paint(QPainter *painter) const override;
+    void translate(double x, double y) override;
+    void moveTo(double x, double y) override;
+    int contain(QPointF p) const override;
+    void adjust(double x, double y, double x0,
+                double y0) override;  // 重写提高效率
 };
 
 #endif  // FIGURE_H

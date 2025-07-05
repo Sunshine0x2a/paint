@@ -78,6 +78,12 @@ AddFigCmd::AddFigCmd(Canva* c, Figure::FigType type, QPointF p) {
             fig->setBrush(canva->dftBrush);
             fig->setVTf(canva->viewTf);
             break;
+        case Figure::Ell:
+            fig = std::make_shared<EllFig>(p, 50, 50);
+            fig->setPen(canva->dftPen);
+            fig->setBrush(canva->dftBrush);
+            fig->setVTf(canva->viewTf);
+            break;
     }
 }
 
@@ -258,6 +264,7 @@ CpsFigCmd::CpsFigCmd(Canva* c, std::vector<Figure*> f) {
     canva = c;
     cpsFig = std::make_shared<CpsFig>(f);
     figList = f;
+    cpsFig->setVTf(canva->viewTf);
     type = Cps;
 }
 
@@ -265,7 +272,9 @@ void CpsFigCmd::execute() {
     for (auto it : figList) {
         canva->removeFromList(it);
         canva->removeFromSelList(it);
+        it->inCps = true;
     }
+    canva->ctrlPtList.clear();
     canva->addToList(cpsFig.get());
     canva->addToSelList(cpsFig.get());
 }
@@ -273,20 +282,15 @@ void CpsFigCmd::execute() {
 void CpsFigCmd::undo() {
     canva->removeFromList(cpsFig.get());
     canva->removeFromSelList(cpsFig.get());
+    canva->ctrlPtList.clear();
     for (auto it : figList) {
         canva->addToList(it);
         canva->addToSelList(it);
+        it->inCps = false;
     }
 }
 
-void CpsFigCmd::redo() {
-    for (auto it : figList) {
-        canva->removeFromList(it);
-        canva->removeFromSelList(it);
-    }
-    canva->addToList(cpsFig.get());
-    canva->addToSelList(cpsFig.get());
-}
+void CpsFigCmd::redo() { execute(); }
 
 CancelCpsCmd::CancelCpsCmd(Canva* c, Figure* f) {
     canva = c;
@@ -300,8 +304,10 @@ CancelCpsCmd::CancelCpsCmd(Canva* c, Figure* f) {
 void CancelCpsCmd::execute() {
     canva->removeFromList(fig);
     canva->removeFromSelList(fig);
+    canva->ctrlPtList.clear();
     for (auto it : fig->List()) {
         canva->addToList(it);
+        it->inCps = false;
         // canva->addToSelList(it);
     }
 }
@@ -309,8 +315,10 @@ void CancelCpsCmd::execute() {
 void CancelCpsCmd::undo() {
     canva->addToList(fig);
     canva->addToSelList(fig);
+    canva->ctrlPtList.clear();
     for (auto it : fig->List()) {
         canva->removeFromList(it);
+        it->inCps = true;
         // canva->removeFromSelList(it);
     }
 }

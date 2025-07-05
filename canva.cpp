@@ -17,6 +17,8 @@ Canva::Canva(QWidget *parent) : QWidget{parent} {
     figMenu = normalMenu->addMenu("添加");
     figMenu->addAction("长方形", this,
                        [this]() { this->onCreate(Figure::Rect); });
+    figMenu->addAction("圆形/椭圆", this,
+                       [this]() { this->onCreate(Figure::Ell); });
     normalMenu->addAction("粘贴", this, &Canva::onPaste);
     normalMenu->addAction("撤销", this, [this]() { cmdStack->undoCommand(); });
     normalMenu->addAction("重做", this, [this]() { cmdStack->redoCommand(); });
@@ -41,8 +43,8 @@ Canva::Canva(QWidget *parent) : QWidget{parent} {
 
     // 测试用矩形
 
-    dftPen = QPen(Qt::red, 2.0);
-    dftBrush = QBrush(Qt::red); /*
+    dftPen = QPen(Qt::black, 2.0);
+    dftBrush = QBrush(Qt::NoBrush); /*
      RectFig *testrect = new RectFig({200, 200}, 50, 50);
      testrect->setBrush(dftBrush);
      testrect->setPen(dftPen);
