@@ -12,13 +12,17 @@ Canva::Canva(QWidget *parent) : QWidget{parent} {
     viewTf->viewPort = this->geometry();
 
     // 菜单项创建
+    initContextMenu();
     // 普通菜单项
+    /*
     normalMenu = new QMenu(this);
     figMenu = normalMenu->addMenu("添加");
     figMenu->addAction("长方形", this,
                        [this]() { this->onCreate(Figure::Rect); });
     figMenu->addAction("圆形/椭圆", this,
                        [this]() { this->onCreate(Figure::Ell); });
+    figMenu->addAction("线条", this,
+                       [this]() { this->onCreate(Figure::Line); });
     normalMenu->addAction("粘贴", this, &Canva::onPaste);
     normalMenu->addAction("撤销", this, [this]() { cmdStack->undoCommand(); });
     normalMenu->addAction("重做", this, [this]() { cmdStack->redoCommand(); });
@@ -37,14 +41,18 @@ Canva::Canva(QWidget *parent) : QWidget{parent} {
         cmdStack->executeCommand(std::make_shared<CpsFigCmd>(this, selList));
     });
     selMenu->addAction("拆散", this, &Canva::onCancelCps);
+    penColorMenu = selMenu->addMenu("设置边框颜色");
+    penColorMenu->addAction("无边框");
+    brushColorMenu = selMenu->addMenu("设置填充颜色");
     // 启用鼠标追踪和上下文菜单
     setMouseTracking(true);
     setContextMenuPolicy(Qt::CustomContextMenu);
-
+    */
     // 测试用矩形
 
     dftPen = QPen(Qt::black, 2.0);
-    dftBrush = QBrush(Qt::NoBrush); /*
+    dftBrush = QBrush(Qt::white);
+    /*
      RectFig *testrect = new RectFig({200, 200}, 50, 50);
      testrect->setBrush(dftBrush);
      testrect->setPen(dftPen);
@@ -96,7 +104,7 @@ std::vector<Figure *> &Canva::SELLIST() { return selList; }
 
 void Canva::paintEvent(QPaintEvent *event) {
     QPainter painter(this);
-
+    painter.setRenderHint(QPainter::Antialiasing);
     painter.fillRect(rect(), Qt::white);
     painter.setPen(dftPen);
     painter.setBrush(dftBrush);
@@ -347,6 +355,119 @@ void Canva::handleMultipleSel() {
     }
 }
 
+void Canva::initContextMenu() {
+    normalMenu = new QMenu(this);
+    figMenu = normalMenu->addMenu("添加");
+    figMenu->addAction("长方形", this,
+                       [this]() { this->onCreate(Figure::Rect); });
+    figMenu->addAction("圆形/椭圆", this,
+                       [this]() { this->onCreate(Figure::Ell); });
+    figMenu->addAction("线条", this,
+                       [this]() { this->onCreate(Figure::Line); });
+    normalMenu->addAction("粘贴", this, &Canva::onPaste);
+    normalMenu->addAction("撤销", this, [this]() { cmdStack->undoCommand(); });
+    normalMenu->addAction("重做", this, [this]() { cmdStack->redoCommand(); });
+    normalMenu->addAction("恢复默认缩放比例", this, [this]() {
+        cmdStack->executeCommand(
+            std::make_shared<RecoverCmd>(this, viewTf->scale));
+    });
+
+    selMenu = new QMenu(this);
+    selMenu->addAction("复制", this, &Canva::onCopy);
+    selMenu->addAction("删除", this, [this]() {
+        if (!selList.empty()) {
+            cmdStack->executeCommand(
+                std::make_shared<DelFigCmd>(this, selList));
+        }
+    });
+    selMenu->addAction("组合", this, [this]() {
+        cmdStack->executeCommand(std::make_shared<CpsFigCmd>(this, selList));
+    });
+    selMenu->addAction("拆散", this, &Canva::onCancelCps);
+    qDebug() << 1;
+
+    // 设置边框颜色菜单
+    penColorMenu = selMenu->addMenu("设置边框颜色");
+    penColorMenu->addAction("无边框", this, [this]() {
+        if (!selList.empty()) {
+            QPen newPen(Qt::NoPen);
+            cmdStack->executeCommand(std::make_shared<SetPenCmd>(
+                selList[0],
+                selList[0]->pen,  // 使用当前图形的pen
+                newPen));
+        }
+    });
+
+    // 添加常用颜色选项
+    addColorActions(penColorMenu, [this](const QColor &color) {
+        if (!selList.empty()) {
+            QPen newPen = selList[0]->pen;  // 获取当前图形的pen
+            newPen.setColor(color);
+            cmdStack->executeCommand(
+                std::make_shared<SetPenCmd>(selList[0],
+                                            selList[0]->pen,  // 记录原始pen
+                                            newPen));
+        }
+    });
+
+    // 添加"更多颜色..."选项
+    penColorMenu->addSeparator();
+    penColorMenu->addAction("更多颜色...", this, [this]() {
+        if (!selList.empty()) {
+            QColor color = QColorDialog::getColor(selList[0]->pen.color(), this,
+                                                  "选择边框颜色");
+            if (color.isValid()) {
+                QPen newPen = selList[0]->pen;
+                newPen.setColor(color);
+                cmdStack->executeCommand(std::make_shared<SetPenCmd>(
+                    selList[0], selList[0]->pen, newPen));
+            }
+        }
+    });
+
+    // 设置填充颜色菜单
+    brushColorMenu = selMenu->addMenu("设置填充颜色");
+
+    // 添加常用颜色选项
+    addColorActions(brushColorMenu, [this](const QColor &color) {
+        if (!selList.empty()) {
+            QBrush newBrush = selList[0]->brush;  // 获取当前图形的brush
+            newBrush.setColor(color);
+            cmdStack->executeCommand(std::make_shared<SetBrushCmd>(
+                selList[0],
+                selList[0]->brush,  // 记录原始brush
+                newBrush));
+        }
+    });
+
+    // 添加"更多颜色..."选项
+    brushColorMenu->addSeparator();
+    brushColorMenu->addAction("更多颜色...", this, [this]() {
+        if (!selList.empty()) {
+            QColor color = QColorDialog::getColor(selList[0]->brush.color(),
+                                                  this, "选择填充颜色");
+            if (color.isValid()) {
+                QBrush newBrush = selList[0]->brush;
+                newBrush.setColor(color);
+                cmdStack->executeCommand(std::make_shared<SetBrushCmd>(
+                    selList[0], selList[0]->brush, newBrush));
+            }
+        }
+    });
+
+    // 无填充选项
+    brushColorMenu->addAction("无填充", this, [this]() {
+        if (!selList.empty()) {
+            QBrush newBrush(Qt::NoBrush);
+            cmdStack->executeCommand(std::make_shared<SetBrushCmd>(
+                selList[0], selList[0]->brush, newBrush));
+        }
+    });
+    setMouseTracking(true);
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    qDebug() << 2;
+}
+
 void Canva::updateNormalMenu() {
     normalMenu->actions()[1]->setEnabled(copyFig != nullptr);   // 粘贴
     normalMenu->actions()[2]->setEnabled(cmdStack->canUndo());  // 撤销
@@ -357,6 +478,28 @@ void Canva::updateSelMenu() {
     selMenu->actions()[2]->setEnabled(selList.size() > 1);  // 组合
     selMenu->actions()[3]->setEnabled(
         selList.size() == 1 && selList[0]->getType() == Figure::Cps);  // 拆散
+}
+
+void Canva::addColorActions(QMenu *menu,
+                            std::function<void(const QColor &)> callback) {
+    QList<QColor> colors = {Qt::black,   Qt::white,  Qt::red,
+                            Qt::green,   Qt::blue,   Qt::cyan,
+                            Qt::magenta, Qt::yellow, Qt::gray};
+
+    QStringList names = {"黑色", "白色", "红色", "绿色", "蓝色",
+                         "青色", "洋红", "黄色", "灰色"};
+
+    for (int i = 0; i < colors.size(); ++i) {
+        QAction *action = new QAction(names[i], menu);
+        QPixmap pixmap(16, 16);
+        pixmap.fill(colors[i]);
+        action->setIcon(QIcon(pixmap));
+
+        connect(action, &QAction::triggered, this,
+                [callback, color = colors[i]]() { callback(color); });
+
+        menu->addAction(action);
+    }
 }
 
 void Canva::onCopy() {

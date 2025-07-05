@@ -15,13 +15,17 @@
 
 class ControlPoint;
 
+inline double operator*(const QPointF &p1, const QPointF &p2) {
+    return QPointF::dotProduct(p1, p2);
+}
+
 class Figure {  // 抽象基类
 public:
     Figure();
     Figure(const Figure &other);
     ~Figure();
-    enum FigType { Rect, CopyCompose, Cps, Ell };
-    bool selected;
+    enum FigType { Rect, CopyCompose, Cps, Ell, Line };
+    bool selected = false;
     bool inCps = false;
     virtual void paint(QPainter *painter) const = 0;
     virtual void translate(double x,
@@ -33,6 +37,7 @@ public:
     virtual void print();  // 调试用
     virtual void setSelected(bool);
     virtual void adjust(double x, double y, double x0, double y0);
+    std::vector<ControlPoint *> getCtrlList();
     // 默认的包围盒的实现，每一种图形都有这个统一的接口,且通过这个函数进行调整时，说明是通过包围盒调整
     void adjust(std::vector<QPointF> p);
 
@@ -134,6 +139,19 @@ public:
     EllFig(QPointF p, int w, int h);
     EllFig(const EllFig &other);
     EllFig *clone() override;
+    void paint(QPainter *painter) const override;
+    void translate(double x, double y) override;
+    void moveTo(double x, double y) override;
+    int contain(QPointF p) const override;
+    void adjust(double x, double y, double x0,
+                double y0) override;  // 重写提高效率
+};
+
+class Line : public Figure {
+public:
+    Line(QPointF p1, QPointF p2);
+    Line(const Line &other);
+    Line *clone() override;
     void paint(QPainter *painter) const override;
     void translate(double x, double y) override;
     void moveTo(double x, double y) override;

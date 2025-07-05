@@ -117,7 +117,7 @@ public:
     void redo();
 
 private:
-    Figure* fig;
+    std::shared_ptr<Figure> fig;
 };
 
 class SelCmd : public Command {  // 不只选中，取消选中也采用该命令
@@ -192,4 +192,29 @@ private:
     Figure* fig;
 };
 
+class SetPenCmd : public Command {
+public:
+    SetPenCmd(Figure* f, QPen pp, QPen np);
+    void execute();
+    void undo();
+    void redo();
+
+private:
+    Figure* fig;
+    QPen prePen;
+    QPen newPen;
+};
+
+class SetBrushCmd : public Command {
+public:
+    SetBrushCmd(Figure* f, QBrush pb, QBrush n);
+    void execute();
+    void undo();
+    void redo();
+
+private:
+    Figure* fig;
+    QBrush preBrush;
+    QBrush newBrush;
+};
 #endif  // COMMAND_H

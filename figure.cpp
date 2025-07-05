@@ -13,7 +13,7 @@ Figure::Figure(const Figure &other)
     for (auto &it : other.ctrlPtList) {
         ctrlPtList.push_back(it->clone());
     }
-    for (auto it : ctrlPtList) {
+    for (auto &it : ctrlPtList) {
         it->setFig(this);
     }
 }
@@ -43,6 +43,8 @@ void Figure::adjust(double dx, double dy, double dx0, double dy0) {
                    it->ry * bdrect.height() + bdrect.top());
     }
 }
+
+std::vector<ControlPoint *> Figure::getCtrlList() { return ctrlPtList; }
 
 void Figure::adjust(std::vector<QPointF> p) {
     if (p.size() != ctrlPtList.size()) {
@@ -241,7 +243,7 @@ void CpsFig::moveTo(double x, double y) {
         it->translate(x - bdrect.x(), y - bdrect.y());
     }
     for (auto it : ctrlPtList) {
-        it->translate(x, y);
+        it->translate(x - bdrect.x(), y - bdrect.y());
     }
     bdrect.moveTo(x, y);
 }
@@ -435,4 +437,66 @@ void EllFig::adjust(double x, double y, double x0, double y0) {
     ctrlPtList[1]->translate((x + x0) / 2, y0);
     ctrlPtList[2]->translate(x, (y + y0) / 2);
     ctrlPtList[3]->translate(x0, (y + y0) / 2);
+}
+
+Line::Line(QPointF p1, QPointF p2) {
+    bdrect = QRectF(p1, p2);
+    type = Figure::Line;
+    ctrlPtList.push_back(new ControlPoint(this, ControlPoint::TopLeft, p1));
+    ctrlPtList.push_back(new ControlPoint(this, ControlPoint::BottomRight, p2));
+}
+
+Line::Line(const Line &other) : Figure(other) {}
+
+Line *Line::clone() { return new Line(*this); }
+
+void Line::paint(QPainter *painter) const {
+    painter->save();
+    painter->setPen(pen);
+    painter->setBrush(brush);
+    painter->drawLine(viewTf->WTV(bdrect.topLeft()),
+                      viewTf->WTV(bdrect.bottomRight()));
+    if (selected) {
+        QPen sectionPen(Qt::DashLine);
+        sectionPen.setColor(Qt::blue);
+        sectionPen.setWidth(3);
+        painter->setPen(sectionPen);
+        painter->drawLine(viewTf->WTV(bdrect.topLeft()),
+                          viewTf->WTV(bdrect.bottomRight()));
+        if (!inCps) {  // 不在组合图形时才可以绘制选中框
+            for (auto it : ctrlPtList) {
+                it->paint(painter);
+            }
+        }
+    }
+    painter->restore();
+}
+
+void Line::translate(double x, double y) {
+    bdrect.translate(x, y);
+    for (auto it : ctrlPtList) {
+        it->translate(x, y);
+    }
+}
+
+void Line::moveTo(double x, double y) {
+    for (auto it : ctrlPtList) {
+        it->translate(QPoint(x, y) - bdrect.topLeft());
+    }
+    bdrect.moveTo(x, y);
+}
+
+int Line::contain(QPointF p) const {
+    QPointF ab = bdrect.topLeft() - bdrect.bottomRight();
+    QPointF ap = bdrect.topLeft() - p;
+    QPointF bp = bdrect.bottomRight() - p;
+    if (ap * ap - (ap * ab) * (ap * ab) / (ab * ab) <= 4 && ap * ab >= 0 &&
+        bp * ab <= 0)
+        return 2;
+    return 0;
+}
+void Line::adjust(double x, double y, double x0, double y0) {
+    ctrlPtList[0]->translate(x, y);
+    ctrlPtList[1]->translate(x0, y0);
+    bdrect.adjust(x, y, x0, y0);
 }

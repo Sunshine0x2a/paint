@@ -3,6 +3,7 @@
 
 #include <QBrush>
 #include <QColor>
+#include <QColorDialog>
 #include <QCursor>
 #include <QEvent>
 #include <QMenu>
@@ -62,6 +63,8 @@ private:
     QMenu *normalMenu;  // 未选中图形下的菜单
     QMenu *figMenu;     // 2级图形菜单
     QMenu *selMenu;     // 有选中图形的菜单
+    QMenu *penColorMenu;  // 颜色菜单
+    QMenu *brushColorMenu;
     CmdStack *cmdStack;
     QTimer *fpstimer;
     QRectF worldBound = {2000, 2000, 2000, 2000};
@@ -83,8 +86,11 @@ private:
     bool contains(const std::vector<T> &vec, const T &element) {
         return std::find(vec.begin(), vec.end(), element) != vec.end();
     }
+    void initContextMenu();
     void updateNormalMenu();
     void updateSelMenu();
+    void addColorActions(QMenu *menu,
+                         std::function<void(const QColor &)> callback);
 
 private slots:
     void onCopy();

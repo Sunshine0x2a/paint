@@ -84,6 +84,12 @@ AddFigCmd::AddFigCmd(Canva* c, Figure::FigType type, QPointF p) {
             fig->setBrush(canva->dftBrush);
             fig->setVTf(canva->viewTf);
             break;
+        case Figure::Line:
+            fig = std::make_shared<Line>(p, p + QPointF{50, 0});
+            fig->setPen(canva->dftPen);
+            fig->setBrush(canva->dftBrush);
+            fig->setVTf(canva->viewTf);
+            break;
     }
 }
 
@@ -171,16 +177,23 @@ void ComposeCmd::redo() {
 PasteCmd::PasteCmd(Canva* c, Figure* f, QPointF p) {
     type = Paste;
     canva = c;
-    Figure* tempFig(f->clone());
-    fig = tempFig;
+    std::shared_ptr<Figure> tempfig(f->clone());
+    fig = tempfig;
     fig->moveTo(p);
     fig->print();
 }
 
-PasteCmd::~PasteCmd() {}
+PasteCmd::~PasteCmd() {
+    if (fig->getType() == Figure::Cps) {
+        CpsFig* cpsfig = static_cast<CpsFig*>(fig.get());
+        for (auto& it : cpsfig->List()) {
+            delete it;
+        }
+    }
+}
 
 void PasteCmd::execute() {
-    canva->addToList(fig);
+    canva->addToList(fig.get());
     if (fig->getType() == Figure::CopyCompose) {
         // 复制对象要进行解包操作;
     }
@@ -189,7 +202,7 @@ void PasteCmd::execute() {
 void PasteCmd::undo() {
     if (fig->getType() == Figure::CopyCompose) {
     }
-    canva->removeFromList(fig);
+    canva->removeFromList(fig.get());
 }
 
 void PasteCmd::redo() { execute(); }
@@ -238,6 +251,10 @@ void MoveCmd::undo() {
     for (auto it : selList) {
         it->translate((prePoint.x() - newPoint.x()),
                       (prePoint.y()) - newPoint.y());
+        qDebug() << it->boundingRect();
+        for (auto i : it->getCtrlPoint()) {
+            qDebug() << i;
+        }
     }
 }
 
@@ -343,3 +360,27 @@ void AdjustCmd::execute() {}  // 只执行，不记录
 void AdjustCmd::undo() { fig->adjust(preList); }
 
 void AdjustCmd::redo() { fig->adjust(newList); }
+
+SetPenCmd::SetPenCmd(Figure* f, QPen pp, QPen np) {
+    fig = f;
+    prePen = pp;
+    newPen = np;
+}
+
+void SetPenCmd::execute() { fig->setPen(newPen); }
+
+void SetPenCmd::undo() { fig->setPen(prePen); }
+
+void SetPenCmd::redo() { execute(); }
+
+SetBrushCmd::SetBrushCmd(Figure* f, QBrush pb, QBrush nb) {
+    fig = f;
+    preBrush = pb;
+    newBrush = nb;
+}
+
+void SetBrushCmd::execute() { fig->setBrush(newBrush); }
+
+void SetBrushCmd::undo() { fig->setBrush(preBrush); }
+
+void SetBrushCmd::redo() { execute(); }
