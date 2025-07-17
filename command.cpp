@@ -78,18 +78,33 @@ AddFigCmd::AddFigCmd(Canva* c, Figure::FigType type, QPointF p) {
             fig->setBrush(canva->dftBrush);
             fig->setVTf(canva->viewTf);
             break;
+        case Figure::Ell:
+            fig = std::make_shared<EllFig>(p, 50, 50);
+            fig->setPen(canva->dftPen);
+            fig->setBrush(canva->dftBrush);
+            fig->setVTf(canva->viewTf);
+            break;
+        case Figure::Line:
+            fig = std::make_shared<Line>(p, p + QPointF{50, 0});
+            fig->setPen(canva->dftPen);
+            fig->setBrush(canva->dftBrush);
+            fig->setVTf(canva->viewTf);
+            break;
     }
 }
 
 AddFigCmd::~AddFigCmd() {}
 
-void AddFigCmd::execute() { canva->addToList(fig); }
+void AddFigCmd::execute() { canva->addToList(fig.get()); }
 
-void AddFigCmd::undo() { canva->removeFromList(fig); }
+void AddFigCmd::undo() {
+    canva->removeFromList(fig.get());
+    canva->ctrlPtList.clear();
+}
 
-void AddFigCmd::redo() { canva->addToList(fig); }
+void AddFigCmd::redo() { canva->addToList(fig.get()); }
 
-DelFigCmd::DelFigCmd(Canva* c, std::vector<std::shared_ptr<Figure>> f) {
+DelFigCmd::DelFigCmd(Canva* c, std::vector<Figure*> f) {
     type = Del;
     canva = c;
     figList = f;
@@ -159,19 +174,26 @@ void ComposeCmd::redo() {
     }
 }
 
-PasteCmd::PasteCmd(Canva* c, std::shared_ptr<Figure> f, QPointF p) {
+PasteCmd::PasteCmd(Canva* c, Figure* f, QPointF p) {
     type = Paste;
     canva = c;
-    std::shared_ptr<Figure> tempFig(f->clone());
-    fig = tempFig;
+    std::shared_ptr<Figure> tempfig(f->clone());
+    fig = tempfig;
     fig->moveTo(p);
     fig->print();
 }
 
-PasteCmd::~PasteCmd() {}
+PasteCmd::~PasteCmd() {
+    if (fig->getType() == Figure::Cps) {
+        CpsFig* cpsfig = static_cast<CpsFig*>(fig.get());
+        for (auto& it : cpsfig->List()) {
+            delete it;
+        }
+    }
+}
 
 void PasteCmd::execute() {
-    canva->addToList(fig);
+    canva->addToList(fig.get());
     if (fig->getType() == Figure::CopyCompose) {
         // 复制对象要进行解包操作;
     }
@@ -180,13 +202,12 @@ void PasteCmd::execute() {
 void PasteCmd::undo() {
     if (fig->getType() == Figure::CopyCompose) {
     }
-    canva->removeFromList(fig);
+    canva->removeFromList(fig.get());
 }
 
 void PasteCmd::redo() { execute(); }
 
-SelCmd::SelCmd(Canva* c, std::vector<std::shared_ptr<Figure>> preL,
-               std::vector<std::shared_ptr<Figure>> newL) {
+SelCmd::SelCmd(Canva* c, std::vector<Figure*> preL, std::vector<Figure*> newL) {
     type = Sel;
     preSelList = preL;
     newSelList = newL;
@@ -215,8 +236,8 @@ void SelCmd::redo() {
     }
 }
 
-MoveCmd::MoveCmd(Canva* c, std::vector<std::shared_ptr<Figure>> selL,
-                 QPointF preP, QPointF newP) {
+MoveCmd::MoveCmd(Canva* c, std::vector<Figure*> selL, QPointF preP,
+                 QPointF newP) {
     canva = c;
     selList = selL;
     prePoint = preP;
@@ -230,6 +251,10 @@ void MoveCmd::undo() {
     for (auto it : selList) {
         it->translate((prePoint.x() - newPoint.x()),
                       (prePoint.y()) - newPoint.y());
+        qDebug() << it->boundingRect();
+        for (auto i : it->getCtrlPoint()) {
+            qDebug() << i;
+        }
     }
 }
 
@@ -252,10 +277,11 @@ void PanCmd::undo() { canva->viewTf->translate(delta); }
 
 void PanCmd::redo() { canva->viewTf->translate(-delta); }
 
-CpsFigCmd::CpsFigCmd(Canva* c, std::vector<std::shared_ptr<Figure>> f) {
+CpsFigCmd::CpsFigCmd(Canva* c, std::vector<Figure*> f) {
     canva = c;
     cpsFig = std::make_shared<CpsFig>(f);
     figList = f;
+    cpsFig->setVTf(canva->viewTf);
     type = Cps;
 }
 
@@ -263,43 +289,42 @@ void CpsFigCmd::execute() {
     for (auto it : figList) {
         canva->removeFromList(it);
         canva->removeFromSelList(it);
+        it->inCps = true;
     }
-    canva->addToList(cpsFig);
-    canva->addToSelList(cpsFig);
+    canva->ctrlPtList.clear();
+    canva->addToList(cpsFig.get());
+    canva->addToSelList(cpsFig.get());
 }
 
 void CpsFigCmd::undo() {
-    canva->removeFromList(cpsFig);
-    canva->removeFromSelList(cpsFig);
+    canva->removeFromList(cpsFig.get());
+    canva->removeFromSelList(cpsFig.get());
+    canva->ctrlPtList.clear();
     for (auto it : figList) {
         canva->addToList(it);
         canva->addToSelList(it);
+        it->inCps = false;
     }
 }
 
-void CpsFigCmd::redo() {
-    for (auto it : figList) {
-        canva->removeFromList(it);
-        canva->removeFromSelList(it);
-    }
-    canva->addToList(cpsFig);
-    canva->addToSelList(cpsFig);
-}
+void CpsFigCmd::redo() { execute(); }
 
-CancelCpsCmd::CancelCpsCmd(Canva* c, std::shared_ptr<Figure> f) {
+CancelCpsCmd::CancelCpsCmd(Canva* c, Figure* f) {
     canva = c;
     if (f->getType() != Figure::Cps) {
         qDebug() << "不是组合图形";
         return;
     }
-    fig = std::dynamic_pointer_cast<CpsFig>(f);
+    fig = dynamic_cast<CpsFig*>(f);
 }
 
 void CancelCpsCmd::execute() {
     canva->removeFromList(fig);
     canva->removeFromSelList(fig);
+    canva->ctrlPtList.clear();
     for (auto it : fig->List()) {
         canva->addToList(it);
+        it->inCps = false;
         // canva->addToSelList(it);
     }
 }
@@ -307,23 +332,26 @@ void CancelCpsCmd::execute() {
 void CancelCpsCmd::undo() {
     canva->addToList(fig);
     canva->addToSelList(fig);
+    canva->ctrlPtList.clear();
     for (auto it : fig->List()) {
         canva->removeFromList(it);
+        it->inCps = true;
         // canva->removeFromSelList(it);
     }
 }
 
 void CancelCpsCmd::redo() { execute(); }
 
-AdjustCmd::AdjustCmd(Canva* c, std::vector<QPointF> pre,
-                     std::shared_ptr<Figure> f) {
+AdjustCmd::AdjustCmd(Canva* c, std::vector<QPointF> pre, Figure* f) {
     canva = c;
     if (f == nullptr) {
         qDebug() << "无效的指针";
         return;
     }
+    fig = f;
     preList = pre;
     newList = f->getCtrlPoint();
+    qDebug() << pre.size() << newList.size();
     type = Adjust;
 }
 
@@ -332,3 +360,27 @@ void AdjustCmd::execute() {}  // 只执行，不记录
 void AdjustCmd::undo() { fig->adjust(preList); }
 
 void AdjustCmd::redo() { fig->adjust(newList); }
+
+SetPenCmd::SetPenCmd(Figure* f, QPen pp, QPen np) {
+    fig = f;
+    prePen = pp;
+    newPen = np;
+}
+
+void SetPenCmd::execute() { fig->setPen(newPen); }
+
+void SetPenCmd::undo() { fig->setPen(prePen); }
+
+void SetPenCmd::redo() { execute(); }
+
+SetBrushCmd::SetBrushCmd(Figure* f, QBrush pb, QBrush nb) {
+    fig = f;
+    preBrush = pb;
+    newBrush = nb;
+}
+
+void SetBrushCmd::execute() { fig->setBrush(newBrush); }
+
+void SetBrushCmd::undo() { fig->setBrush(preBrush); }
+
+void SetBrushCmd::redo() { execute(); }

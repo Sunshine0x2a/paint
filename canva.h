@@ -3,10 +3,12 @@
 
 #include <QBrush>
 #include <QColor>
+#include <QColorDialog>
 #include <QCursor>
 #include <QEvent>
 #include <QMenu>
 #include <QMouseEvent>
+#include <QObject>
 #include <QPainter>
 #include <QPen>
 #include <QTimer>
@@ -25,12 +27,12 @@ public:
     ~Canva();
     QPen dftPen;
     QBrush dftBrush;
-    void addToList(std::shared_ptr<Figure>);
-    void removeFromList(std::shared_ptr<Figure>);
-    void addToSelList(std::shared_ptr<Figure>);
-    void removeFromSelList(std::shared_ptr<Figure>);
-    void addToCtrlPtList(std::vector<std::shared_ptr<ControlPoint>>);
-    void removeFromCtrlPtList(std::vector<std::shared_ptr<ControlPoint>>);
+    void addToList(Figure *);
+    void removeFromList(Figure *);
+    void addToSelList(Figure *);
+    void removeFromSelList(Figure *);
+    void addToCtrlPtList(std::vector<ControlPoint *>);
+    void removeFromCtrlPtList(std::vector<ControlPoint *>);
     QPointF viewPos;           // 鼠标视图位置
     QPointF worldPos;          // 鼠标在逻辑世界中的位置
     QPointF globalPos;         // 鼠标全局位置
@@ -40,7 +42,7 @@ public:
     QPointF tempLastWorldPos;  // 临时记录移动图形时鼠标的位置，实现平滑移动
     QPointF tempLastGlobalPos;
     ViewTransform *viewTf;
-    std::vector<std::shared_ptr<Figure>> &SELLIST();
+    std::vector<Figure *> &SELLIST();
 
 protected:
     void paintEvent(QPaintEvent *event);
@@ -53,14 +55,16 @@ protected:
     void resizeEvent(QResizeEvent *event);
 
 private:
-    std::vector<std::shared_ptr<Figure>> figList;
-    std::vector<std::shared_ptr<Figure>> selList;  // 选中图形列表
-    std::vector<std::shared_ptr<Figure>> preSelList;  // 记录过去选择的图形列表
-    std::vector<std::shared_ptr<ControlPoint>> ctrlPtList;
-    std::vector<QPointF> prePtList;  // 记录过去图形控制点的坐标;
+    std::vector<Figure *> figList;
+    std::vector<Figure *> selList;     // 选中图形列表
+    std::vector<Figure *> preSelList;  // 记录过去选择的图形列表
+    std::vector<ControlPoint *> ctrlPtList;
+    std::vector<QPointF> preCtrlPtLocation;  // 记录过去控制图形的位置
     QMenu *normalMenu;  // 未选中图形下的菜单
     QMenu *figMenu;     // 2级图形菜单
     QMenu *selMenu;     // 有选中图形的菜单
+    QMenu *penColorMenu;  // 颜色菜单
+    QMenu *brushColorMenu;
     CmdStack *cmdStack;
     QTimer *fpstimer;
     QRectF worldBound = {2000, 2000, 2000, 2000};
@@ -68,27 +72,34 @@ private:
     bool is_selecting = false;  // 记录是否在进行多选
     bool is_zooming = false;    // 记录是否在缩放屏幕
     bool is_dragging = false;   // 记录是否在拖拽图形
+    bool is_adjusting = false;
     bool has_selCPt = false;    // 记录是否已经选中了控制点
     double preScale = 1;
     double newScale = 1;  // 分别记录缩放
-    std::shared_ptr<Figure> copyFig = nullptr;
-    std::shared_ptr<ControlPoint> selCPt = nullptr;
-    std::shared_ptr<Figure> preSelFig = nullptr;  // 记录上一次选择的图形
+    Figure *copyFig = nullptr;
+    ControlPoint *selCPt = nullptr;
+    void onAdjust();
     void onCreate(Figure::FigType type);
-    void onAdjust(std::shared_ptr<Figure> fig, std::vector<QPointF> preList);
     void handleSingleSel();
     void handleMultipleSel();
     template <typename T>
     bool contains(const std::vector<T> &vec, const T &element) {
         return std::find(vec.begin(), vec.end(), element) != vec.end();
     }
+    void initContextMenu();
     void updateNormalMenu();
     void updateSelMenu();
+    void addColorActions(QMenu *menu,
+                         std::function<void(const QColor &)> callback);
 
 private slots:
     void onCopy();
     void onPaste();
     void onCancelCps();
+
+    friend class AddFigCmd;
+    friend class CpsFigCmd;  // 仅用于调用控制点列表
+    friend class CancelCpsCmd;
 };
 
 #endif  // CANVA_H

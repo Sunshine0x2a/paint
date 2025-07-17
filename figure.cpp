@@ -5,20 +5,25 @@ Figure::Figure() {}
 Figure::Figure(const Figure &other)
     : selected(false),
       bdrect(other.bdrect),
+      type(other.type),
       pen(other.pen),
       brush(other.brush),
-      type(other.type),
-      viewTf(other.viewTf)  // 目前实现的是单个画布，实现多画布时在进行改动
-{
+      viewTf(other.viewTf),  // 目前实现的是单个画布，实现多画布时在进行改动
+      inCps(other.inCps) {
     for (auto &it : other.ctrlPtList) {
-        ctrlPtList.push_back(std::make_shared<ControlPoint>(*it));
+        ctrlPtList.push_back(it->clone());
     }
-    for (auto it : ctrlPtList) {
-        it->setFig(std::shared_ptr<Figure>(this));
+    for (auto &it : ctrlPtList) {
+        it->setFig(this);
     }
 }
 
-Figure::~Figure() { qDebug() << "Figure 析构：" << this; }
+Figure::~Figure() {
+    for (auto it : ctrlPtList) {
+        delete it;
+    }
+    ctrlPtList.clear();
+}
 
 void Figure::moveTo(QPointF p) { moveTo(p.x(), p.y()); }
 
@@ -30,6 +35,16 @@ void Figure::print() {
 }
 
 void Figure::setSelected(bool i) { selected = i; }
+
+void Figure::adjust(double dx, double dy, double dx0, double dy0) {
+    bdrect.adjust(dx, dy, dx0, dy0);
+    for (auto it : ctrlPtList) {
+        it->moveTo(it->rx * bdrect.width() + bdrect.left(),
+                   it->ry * bdrect.height() + bdrect.top());
+    }
+}
+
+std::vector<ControlPoint *> Figure::getCtrlList() { return ctrlPtList; }
 
 void Figure::adjust(std::vector<QPointF> p) {
     if (p.size() != ctrlPtList.size()) {
@@ -56,10 +71,37 @@ std::vector<QPointF> Figure::getCtrlPoint() {
 Figure::FigType Figure::getType() { return type; }
 
 ControlPoint::ControlPoint(Figure *f, dir i, QPointF p) {
-    std::shared_ptr<Figure> temp(f);
-    fig = temp;
+    fig = f;
     type = i;
     bdrect = QRectF{p - QPointF{rad, rad}, p + QPointF{rad, rad}};
+    switch (type) {
+        case TopLeft:
+            rx = 0, ry = 0;
+            break;
+        case TopRight:
+            rx = 1, ry = 0;
+            break;
+        case BottomLeft:
+            rx = 0, ry = 1;
+            break;
+        case BottomRight:
+            rx = 1, ry = 1;
+            break;
+        case Top:
+            rx = 0.5, ry = 0;
+            break;
+        case Bottom:
+            rx = 0.5, ry = 1;
+            break;
+        case Left:
+            rx = 0, ry = 0.5;
+            break;
+        case Right:
+            rx = 1, ry = 0.5;
+            break;
+        default:
+            break;
+    }
 }
 
 ControlPoint::ControlPoint(const ControlPoint &other) {
@@ -68,6 +110,8 @@ ControlPoint::ControlPoint(const ControlPoint &other) {
     bdrect = other.bdrect;
     rad = other.rad;
 }
+
+ControlPoint::~ControlPoint() { qDebug() << "ctrlPt released" << this; }
 
 void ControlPoint::paint(QPainter *painter) {
     painter->save();
@@ -84,6 +128,10 @@ void ControlPoint::translate(double x, double y) {
 }
 void ControlPoint::translate(QPointF p) { bdrect.translate(p); }
 
+void ControlPoint::moveTo(double x, double y) { moveTo({x, y}); }
+
+void ControlPoint::moveTo(QPointF p) { translate(p - bdrect.center()); }
+
 void ControlPoint::ctrlTranslate(double x, double y) {
     switch (type) {
         case TopLeft:
@@ -93,10 +141,22 @@ void ControlPoint::ctrlTranslate(double x, double y) {
             fig->adjust(0, y, x, 0);
             break;
         case BottomLeft:
-            fig->adjust(x, 0, y, 0);
+            fig->adjust(x, 0, 0, y);
             break;
         case BottomRight:
             fig->adjust(0, 0, x, y);
+            break;
+        case Top:
+            fig->adjust(0, y, 0, 0);
+            break;
+        case Bottom:
+            fig->adjust(0, 0, 0, y);
+            break;
+        case Left:
+            fig->adjust(x, 0, 0, 0);
+            break;
+        case Right:
+            fig->adjust(0, 0, x, 0);
             break;
     }
 }
@@ -107,25 +167,150 @@ void ControlPoint::ctrlMoveTo(double x, double y) { ctrlMoveTo({x, y}); }
 
 void ControlPoint::ctrlMoveTo(QPointF p) { ctrlTranslate(p - bdrect.center()); }
 
-void ControlPoint::setFig(std::shared_ptr<Figure> f) { fig = f; }
+void ControlPoint::setFig(Figure *f) { fig = f; }
 
 ControlPoint *ControlPoint::clone() { return new ControlPoint(*this); }
 
 bool ControlPoint::contain(QPointF p) { return bdrect.contains(p); }
 
-std::shared_ptr<Figure> ControlPoint::getParent() { return fig; }
+Figure *ControlPoint::getParent() { return fig; }
+
+CpsFig::CpsFig(std::vector<Figure *> f) {
+    type = Cps;
+    figList = f;
+    bdrect = f[0]->boundingRect();
+    for (auto it : f) {
+        bdrect = bdrect.united(it->boundingRect());
+        it->inCps = true;
+    }
+    ctrlPtList.push_back(
+        new ControlPoint(this, ControlPoint::TopLeft, bdrect.topLeft()));
+    ctrlPtList.push_back(
+        new ControlPoint(this, ControlPoint::TopRight, bdrect.topRight()));
+    ctrlPtList.push_back(
+        new ControlPoint(this, ControlPoint::BottomLeft, bdrect.bottomLeft()));
+    ctrlPtList.push_back(new ControlPoint(this, ControlPoint::BottomRight,
+                                          bdrect.bottomRight()));
+}
+
+CpsFig::CpsFig(const CpsFig &other) : Figure(other) {
+    for (auto it : other.figList) {
+        auto i = it->clone();
+        figList.push_back(i);
+    }
+}
+
+void CpsFig::paint(QPainter *painter) const {
+    if (selected) {
+        for (auto &it : figList) {
+            it->selected = true;
+        }
+    } else {
+        for (auto &it : figList) {
+            it->selected = false;
+        }
+    }
+    for (auto &it : figList) {
+        it->paint(painter);
+    }
+    if (selected && !inCps) {
+        painter->save();
+        QPen sectionPen(Qt::DashLine);
+        sectionPen.setColor(Qt::black);
+        sectionPen.setWidth(1);
+        painter->setPen(sectionPen);
+        painter->setBrush(Qt::NoBrush);
+        painter->drawRect(viewTf->WTV(bdrect));
+        painter->restore();
+        for (auto it : ctrlPtList) {
+            it->paint(painter);
+        }
+    }
+}
+
+void CpsFig::translate(double x, double y) {
+    for (auto it : figList) {
+        it->translate(x, y);
+    }
+    bdrect.translate(x, y);
+    for (auto it : ctrlPtList) {
+        it->translate(x, y);
+    }
+}
+
+void CpsFig::moveTo(double x, double y) {
+    for (auto it : figList) {
+        it->translate(x - bdrect.x(), y - bdrect.y());
+    }
+    for (auto it : ctrlPtList) {
+        it->translate(x - bdrect.x(), y - bdrect.y());
+    }
+    bdrect.moveTo(x, y);
+}
+
+int CpsFig::contain(QPointF p) const {
+    int ans = 0;
+    for (auto &it : figList) {
+        ans = std::max(ans, it->contain(p));
+        if (ans == 2) {  // 检测到一个精准移动时，直接返回
+            return ans;
+        }
+    }
+    return ans;
+}
+
+CpsFig *CpsFig::clone() { return new CpsFig(*this); }
+
+void CpsFig::adjust(double x, double y, double x0, double y0) {
+    QRectF oldRect = bdrect;
+    bdrect.adjust(x, y, x0, y0);
+    ctrlPtList[0]->translate(x, y);
+    ctrlPtList[1]->translate(x0, y);
+    ctrlPtList[2]->translate(x, y0);
+    ctrlPtList[3]->translate(x0, y0);
+    double scaleX = (oldRect.width() + x0 - x) / oldRect.width();
+    double scaleY = (oldRect.height() + y0 - y) / oldRect.height();
+    for (auto it : figList) {
+        QRectF subRect = it->boundingRect();
+
+        // 计算子图形的新位置（考虑缩放）
+        double subX = bdrect.left() +
+                      (subRect.left() - oldRect.left()) * scaleX -
+                      subRect.left();
+        double subY = bdrect.top() + (subRect.top() - oldRect.top()) * scaleY -
+                      subRect.top();
+        double subX0 = bdrect.right() +
+                       (subRect.right() - oldRect.right()) * scaleX -
+                       subRect.right();
+        double subY0 = bdrect.bottom() +
+                       (subRect.bottom() - oldRect.bottom()) * scaleY -
+                       subRect.bottom();
+
+        it->adjust(subX, subY, subX0, subY0);
+    }
+}
+
+void CpsFig::setSelected(bool b) {
+    for (auto it : figList) {
+        it->setSelected(b);
+    }
+    selected = b;
+}
+
+std::vector<Figure *> CpsFig::List() { return figList; }
 
 RectFig::RectFig(QPointF p, int w, int h) {
     bdrect = QRectF{p, QPointF(p.x() + w, p.y() + h)};
+    type = Rect;
     selected = false;
-    ctrlPtList.push_back(std::make_shared<ControlPoint>(
-        this, ControlPoint::TopLeft, bdrect.topLeft()));
-    ctrlPtList.push_back(std::make_shared<ControlPoint>(
-        this, ControlPoint::TopRight, bdrect.topRight()));
-    ctrlPtList.push_back(std::make_shared<ControlPoint>(
-        this, ControlPoint::BottomLeft, bdrect.bottomLeft()));
-    ctrlPtList.push_back(std::make_shared<ControlPoint>(
-        this, ControlPoint::BottomRight, bdrect.bottomRight()));
+    ctrlPtList.push_back(
+        new ControlPoint(this, ControlPoint::TopLeft, bdrect.topLeft()));
+    ctrlPtList.push_back(
+        new ControlPoint(this, ControlPoint::TopRight, bdrect.topRight()));
+    ctrlPtList.push_back(
+        new ControlPoint(this, ControlPoint::BottomLeft, bdrect.bottomLeft()));
+    ctrlPtList.push_back(new ControlPoint(this, ControlPoint::BottomRight,
+                                          bdrect.bottomRight()));
     qDebug() << "a rect is created";
 }
 
@@ -142,8 +327,10 @@ void RectFig::paint(QPainter *painter) const {
         sectionPen.setWidth(3);
         painter->setPen(sectionPen);
         painter->drawRect(viewTf->WTV(bdrect));
-        for (auto it : ctrlPtList) {
-            it->paint(painter);
+        if (!inCps) {  // 不在组合图形时才可以绘制选中框
+            for (auto it : ctrlPtList) {
+                it->paint(painter);
+            }
         }
     }
     painter->restore();
@@ -180,62 +367,136 @@ void RectFig::adjust(double x, double y, double x0, double y0) {
     ctrlPtList[3]->translate(x0, y0);
 }
 
-CpsFig::CpsFig(std::vector<std::shared_ptr<Figure>> f) {
-    type = Cps;
-    figList = f;
-    bdrect = f[0]->boundingRect();
-    for (auto it : f) {
-        bdrect = bdrect.united(it->boundingRect());
-    }
+EllFig::EllFig(QPointF p, int w, int h) {
+    bdrect = QRectF{p, QPointF(p.x() + w, p.y() + h)};
+    selected = false;
+    type = Ell;
+    ctrlPtList.push_back(
+        new ControlPoint(this, ControlPoint::Top, {p.x() + w / 2, p.y()}));
+    ctrlPtList.push_back(new ControlPoint(this, ControlPoint::Bottom,
+                                          {p.x() + w / 2, p.y() + h}));
+    ctrlPtList.push_back(
+        new ControlPoint(this, ControlPoint::Left, {p.x(), p.y() + h / 2}));
+    ctrlPtList.push_back(new ControlPoint(this, ControlPoint::Right,
+                                          {p.x() + w, p.y() + h / 2}));
 }
 
-CpsFig::CpsFig(const CpsFig &other) : Figure(other) {
-    for (auto it : other.figList) {
-        auto i = it->clone();
-        figList.push_back(std::shared_ptr<Figure>(i));
-    }
-}
+EllFig::EllFig(const EllFig &other) : Figure(other) {}
 
-void CpsFig::paint(QPainter *painter) const {
+EllFig *EllFig::clone() { return new EllFig(*this); }
+
+void EllFig::paint(QPainter *painter) const {
+    painter->save();
+    painter->setPen(pen);
+    painter->setBrush(brush);
+    painter->drawEllipse(viewTf->WTV(bdrect));
     if (selected) {
-        for (auto &it : figList) {
-            it->selected = true;
-        }
-    } else {
-        for (auto &it : figList) {
-            it->selected = false;
+        QPen sectionPen(Qt::DashLine);
+        sectionPen.setColor(Qt::blue);
+        sectionPen.setWidth(3);
+        painter->setPen(sectionPen);
+        painter->drawEllipse(viewTf->WTV(bdrect));
+        if (!inCps) {  // 不在组合图形时才可以绘制选中框
+            for (auto it : ctrlPtList) {
+                it->paint(painter);
+            }
         }
     }
-    for (auto &it : figList) {
-        it->paint(painter);
-    }
+    painter->restore();
 }
 
-void CpsFig::translate(double x, double y) {
-    for (auto it : figList) {
+void EllFig::translate(double x, double y) {
+    bdrect.translate(x, y);
+    for (auto it : ctrlPtList) {
         it->translate(x, y);
     }
 }
 
-void CpsFig::moveTo(double x, double y) {
-    for (auto it : figList) {
-        it->translate(x - bdrect.x(), y - bdrect.y());
+void EllFig::moveTo(double x, double y) {
+    for (auto it : ctrlPtList) {
+        it->translate(QPoint(x, y) - bdrect.topLeft());
     }
+    bdrect.moveTo(x, y);
 }
 
-int CpsFig::contain(QPointF p) const {
-    int ans = 0;
-    for (auto &it : figList) {
-        ans = std::max(ans, it->contain(p));
-        if (ans == 2) {  // 检测到一个精准移动时，直接返回
-            return ans;
+int EllFig::contain(QPointF p) const {
+    if (bdrect.contains(p)) {
+        double dx = p.x() - bdrect.center().x();
+        double dy = p.y() - bdrect.center().y();
+        if (dx * dx / bdrect.width() + dy * dy / bdrect.height() <= 2) {
+            return 2;
+        }
+        return 1;
+    }
+    return 0;
+}
+
+void EllFig::adjust(double x, double y, double x0, double y0) {
+    bdrect.adjust(x, y, x0, y0);
+    ctrlPtList[0]->translate((x + x0) / 2, y);
+    ctrlPtList[1]->translate((x + x0) / 2, y0);
+    ctrlPtList[2]->translate(x, (y + y0) / 2);
+    ctrlPtList[3]->translate(x0, (y + y0) / 2);
+}
+
+Line::Line(QPointF p1, QPointF p2) {
+    bdrect = QRectF(p1, p2);
+    type = Figure::Line;
+    ctrlPtList.push_back(new ControlPoint(this, ControlPoint::TopLeft, p1));
+    ctrlPtList.push_back(new ControlPoint(this, ControlPoint::BottomRight, p2));
+}
+
+Line::Line(const Line &other) : Figure(other) {}
+
+Line *Line::clone() { return new Line(*this); }
+
+void Line::paint(QPainter *painter) const {
+    painter->save();
+    painter->setPen(pen);
+    painter->setBrush(brush);
+    painter->drawLine(viewTf->WTV(bdrect.topLeft()),
+                      viewTf->WTV(bdrect.bottomRight()));
+    if (selected) {
+        QPen sectionPen(Qt::DashLine);
+        sectionPen.setColor(Qt::blue);
+        sectionPen.setWidth(3);
+        painter->setPen(sectionPen);
+        painter->drawLine(viewTf->WTV(bdrect.topLeft()),
+                          viewTf->WTV(bdrect.bottomRight()));
+        if (!inCps) {  // 不在组合图形时才可以绘制选中框
+            for (auto it : ctrlPtList) {
+                it->paint(painter);
+            }
         }
     }
-    return ans;
+    painter->restore();
 }
 
-CpsFig *CpsFig::clone() { return new CpsFig(*this); }
+void Line::translate(double x, double y) {
+    bdrect.translate(x, y);
+    for (auto it : ctrlPtList) {
+        it->translate(x, y);
+    }
+}
 
-void CpsFig::adjust(double x, double y, double x0, double y0) {}
+void Line::moveTo(double x, double y) {
+    for (auto it : ctrlPtList) {
+        it->translate(QPoint(x, y) - bdrect.topLeft());
+    }
+    bdrect.moveTo(x, y);
+}
 
-std::vector<std::shared_ptr<Figure>> CpsFig::List() { return figList; }
+int Line::contain(QPointF p) const {
+    QPointF ab = bdrect.topLeft() - bdrect.bottomRight();
+    QPointF ap = bdrect.topLeft() - p;
+    QPointF bp = bdrect.bottomRight() - p;
+    if (ap * ap - (ap * ab) * (ap * ab) / (ab * ab) <= 4 && ap * ab >= 0 &&
+        bp * ab <= 0)
+        return 2;
+    return 0;
+}
+void Line::adjust(double x, double y, double x0, double y0) {
+    ctrlPtList[0]->translate(x, y);
+    ctrlPtList[1]->translate(x0, y0);
+    bdrect.adjust(x, y, x0, y0);
+}
